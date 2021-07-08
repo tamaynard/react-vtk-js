@@ -219,6 +219,17 @@ export default class View extends Component {
       }
     };
 
+    const checkZoomLimit = () => {
+      if (
+        this.props.zoomLimit !== 1.0 &&
+        this.distance * (1.0 - this.props.zoomLimit) >
+          this.renderer.getActiveCamera().getDistance()
+      )
+        this.renderer
+          .getActiveCamera()
+          .setDistance(this.distance * (1.0 - this.props.zoomLimit));
+    };
+
     const hover = debounce(({ x, y }) => {
       if (this.props.pickingModes.indexOf('hover') === -1) {
         return;
@@ -258,8 +269,12 @@ export default class View extends Component {
       }
     };
 
+    this.distance = Infinity;
+
     this.onClick = (e) => click(this.getScreenEventPositionFor(e));
     this.onMouseMove = (e) => hover(this.getScreenEventPositionFor(e));
+    this.onWheel = () => checkZoomLimit();
+    this.onDrag = () => checkZoomLimit();
     this.lastSelection = [];
 
     this.onBoxSelectChange = select;
@@ -311,6 +326,7 @@ export default class View extends Component {
         onMouseLeave={this.onLeave}
         onClick={this.onClick}
         onMouseMove={this.onMouseMove}
+        onDrag={this.onDrag}
       >
         <div style={RENDERER_STYLE} ref={this.containerRef} />
         <div>
@@ -340,6 +356,7 @@ export default class View extends Component {
     this.resizeObserver.observe(container);
     this.update(this.props);
     document.addEventListener('keyup', this.handleKey);
+    container.addEventListener('wheel', this.onWheel);
     this.resetCamera();
 
     // Give a chance for the first layout to properly reset the camera
@@ -356,6 +373,7 @@ export default class View extends Component {
     }
 
     document.removeEventListener('keyup', this.handleKey);
+    this.containerRef.removeEventListener('wheel', this.onWheel);
     // Stop size listening
     this.resizeObserver.disconnect();
     this.resizeObserver = null;
@@ -455,6 +473,7 @@ export default class View extends Component {
     this.style.setCenterOfRotation(
       this.renderer.getActiveCamera().getFocalPoint()
     );
+    this.distance = this.renderer.getActiveCamera().getDistance();
     this.renderWindow.render();
   }
 
@@ -541,6 +560,7 @@ View.defaultProps = {
   cameraViewUp: [0, 1, 0],
   cameraParallelProjection: false,
   triggerRender: 0,
+  zoomLimit: 1.0,
   triggerResetCamera: 0,
   interactorSettings: [
     {
@@ -628,6 +648,11 @@ View.propTypes = {
    * Property use to trigger a render when changing.
    */
   triggerRender: PropTypes.number,
+
+  /**
+   * Maximum zoom level before moving focal point
+   */
+  zoomLimit: PropTypes.number,
 
   /**
    * Property use to trigger a resetCamera when changing.
