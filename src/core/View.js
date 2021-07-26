@@ -136,13 +136,15 @@ export default class View extends Component {
     this.openglRenderWindow = vtkOpenGLRenderWindow.newInstance();
     this.renderWindow.addView(this.openglRenderWindow);
 
-    this.interactor = vtkRenderWindowInteractor.newInstance();
-    this.interactor.setView(this.openglRenderWindow);
-    this.interactor.initialize();
+    if (props.interactive) {
+      this.interactor = vtkRenderWindowInteractor.newInstance();
+      this.interactor.setView(this.openglRenderWindow);
+      this.interactor.initialize();
 
-    // Interactor style
-    this.style = vtkInteractorStyleManipulator.newInstance();
-    this.interactor.setInteractorStyle(this.style);
+      // Interactor style
+      this.style = vtkInteractorStyleManipulator.newInstance();
+      this.interactor.setInteractorStyle(this.style);
+    }
 
     // Picking handler
     this.selector = vtkOpenGLHardwareSelector.newInstance({
@@ -178,7 +180,7 @@ export default class View extends Component {
       }
       this.cubeAxes.setDataBounds(bbox.getBounds());
     };
-    const debouncedCubeBounds = debounce(this.updateCubeBounds, 50);
+    this.debouncedCubeBounds = debounce(this.updateCubeBounds, 50);
 
     // Internal functions
     this.hasFocus = false;
@@ -219,6 +221,7 @@ export default class View extends Component {
       }
     };
 
+<<<<<<< HEAD
     const checkZoomLimit = () => {
       if (
         this.props.zoomLimit !== 1.0 &&
@@ -231,6 +234,9 @@ export default class View extends Component {
     };
 
     const hover = debounce(({ x, y }) => {
+=======
+    this.hover = debounce(({ x, y }) => {
+>>>>>>> d132670c122d3a3f16a3188735815012f25069bc
       if (this.props.pickingModes.indexOf('hover') === -1) {
         return;
       }
@@ -272,7 +278,7 @@ export default class View extends Component {
     this.distance = Infinity;
 
     this.onClick = (e) => click(this.getScreenEventPositionFor(e));
-    this.onMouseMove = (e) => hover(this.getScreenEventPositionFor(e));
+    this.onMouseMove = (e) => this.hover(this.getScreenEventPositionFor(e));
     this.onWheel = () => checkZoomLimit();
     this.onDrag = () => checkZoomLimit();
     this.lastSelection = [];
@@ -294,7 +300,7 @@ export default class View extends Component {
     this.subscriptions.push(
       this.renderer.onEvent(({ type, renderer }) => {
         if (renderer && type === 'ComputeVisiblePropBoundsEvent') {
-          debouncedCubeBounds();
+          this.debouncedCubeBounds();
         }
       })
     );
@@ -339,11 +345,11 @@ export default class View extends Component {
   onResize() {
     const container = this.containerRef.current;
     if (container) {
+      const devicePixelRatio = window.devicePixelRatio || 1;
       const { width, height } = container.getBoundingClientRect();
-      this.openglRenderWindow.setSize(
-        Math.max(width, 10),
-        Math.max(height, 10)
-      );
+      const w = Math.floor(width * devicePixelRatio);
+      const h = Math.floor(height * devicePixelRatio);
+      this.openglRenderWindow.setSize(Math.max(w, 10), Math.max(h, 10));
       this.renderWindow.render();
     }
   }
@@ -351,7 +357,9 @@ export default class View extends Component {
   componentDidMount() {
     const container = this.containerRef.current;
     this.openglRenderWindow.setContainer(container);
-    this.interactor.bindEvents(container);
+    if (this.props.interactive) {
+      this.interactor.bindEvents(container);
+    }
     this.onResize();
     this.resizeObserver.observe(container);
     this.update(this.props);
@@ -360,7 +368,7 @@ export default class View extends Component {
     this.resetCamera();
 
     // Give a chance for the first layout to properly reset the camera
-    setTimeout(() => this.resetCamera(), 100);
+    this.firstResetTimeout = setTimeout(() => this.resetCamera(), 100);
   }
 
   componentDidUpdate(prevProps, prevState, snapshot) {
@@ -368,6 +376,12 @@ export default class View extends Component {
   }
 
   componentWillUnmount() {
+    if (this.debouncedCubeBounds) this.debouncedCubeBounds.cancel();
+    if (this.hover) this.hover.cancel();
+    clearTimeout(this.resetCameraTimeout);
+    clearTimeout(this.renderViewTimeout);
+    clearTimeout(this.firstResetTimeout);
+
     while (this.subscriptions.length) {
       this.subscriptions.pop().unsubscribe();
     }
@@ -379,15 +393,19 @@ export default class View extends Component {
     this.resizeObserver = null;
 
     // Detatch from DOM
-    this.interactor.unbindEvents();
+    if (this.interactor) {
+      this.interactor.unbindEvents();
+    }
     this.openglRenderWindow.setContainer(null);
 
     // Free memory
     this.renderWindow.removeRenderer(this.renderer);
     this.renderWindow.removeView(this.openglRenderWindow);
 
-    this.interactor.delete();
-    this.interactor = null;
+    if (this.interactor) {
+      this.interactor.delete();
+      this.interactor = null;
+    }
 
     this.renderer.delete();
     this.renderer = null;
@@ -403,6 +421,7 @@ export default class View extends Component {
     const {
       background,
       interactorSettings,
+      interactive,
       cameraPosition,
       cameraViewUp,
       cameraParallelProjection,
@@ -415,6 +434,7 @@ export default class View extends Component {
       this.renderer.setBackground(background);
     }
     if (
+      interactive &&
       interactorSettings &&
       (!previous || interactorSettings !== previous.interactorSettings)
     ) {
@@ -461,19 +481,27 @@ export default class View extends Component {
 
     // Allow to trigger method call from property change
     if (previous && triggerRender !== previous.triggerRender) {
-      setTimeout(this.renderView, 0);
+      this.renderViewTimeout = setTimeout(this.renderView, 0);
     }
     if (previous && triggerResetCamera !== previous.triggerResetCamera) {
-      setTimeout(this.resetCamera, 0);
+      this.resetCameraTimeout = setTimeout(this.resetCamera, 0);
     }
   }
 
   resetCamera() {
     this.renderer.resetCamera();
+<<<<<<< HEAD
     this.style.setCenterOfRotation(
       this.renderer.getActiveCamera().getFocalPoint()
     );
     this.distance = this.renderer.getActiveCamera().getDistance();
+=======
+    if (this.props.interactive) {
+      this.style.setCenterOfRotation(
+        this.renderer.getActiveCamera().getFocalPoint()
+      );
+    }
+>>>>>>> d132670c122d3a3f16a3188735815012f25069bc
     this.renderWindow.render();
   }
 
@@ -598,6 +626,7 @@ View.defaultProps = {
       shift: true,
     },
   ],
+  interactive: true,
   pickingModes: [],
   showCubeAxes: false,
 };
@@ -628,6 +657,11 @@ View.propTypes = {
    * Configure the interactions
    */
   interactorSettings: PropTypes.array,
+
+  /**
+   * Enable/Disable interaction
+   */
+  interactive: PropTypes.bool,
 
   /**
    * Initial camera position from an object in [0,0,0]
