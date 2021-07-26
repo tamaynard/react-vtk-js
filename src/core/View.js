@@ -221,7 +221,6 @@ export default class View extends Component {
       }
     };
 
-<<<<<<< HEAD
     const checkZoomLimit = () => {
       if (
         this.props.zoomLimit !== 1.0 &&
@@ -233,10 +232,7 @@ export default class View extends Component {
           .setDistance(this.distance * (1.0 - this.props.zoomLimit));
     };
 
-    const hover = debounce(({ x, y }) => {
-=======
     this.hover = debounce(({ x, y }) => {
->>>>>>> d132670c122d3a3f16a3188735815012f25069bc
       if (this.props.pickingModes.indexOf('hover') === -1) {
         return;
       }
@@ -490,18 +486,12 @@ export default class View extends Component {
 
   resetCamera() {
     this.renderer.resetCamera();
-<<<<<<< HEAD
-    this.style.setCenterOfRotation(
-      this.renderer.getActiveCamera().getFocalPoint()
-    );
-    this.distance = this.renderer.getActiveCamera().getDistance();
-=======
     if (this.props.interactive) {
       this.style.setCenterOfRotation(
         this.renderer.getActiveCamera().getFocalPoint()
       );
+      this.distance = this.renderer.getActiveCamera().getDistance();
     }
->>>>>>> d132670c122d3a3f16a3188735815012f25069bc
     this.renderWindow.render();
   }
 
