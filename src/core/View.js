@@ -205,7 +205,7 @@ export default class View extends Component {
     };
 
     // Handle picking
-    const handlePicking = (callback, pickingMode, { x, y }) => {
+    const handlePicking = (callback, pickingMode, { x, y }, event) => {
       if (this.props.pickingModes.indexOf(pickingMode) === -1) {
         return;
       }
@@ -220,7 +220,7 @@ export default class View extends Component {
 
       // Share the selection with the rest of the world
       if (callback) {
-        callback(selection[0]);
+        callback(selection[0], event);
       }
 
       if ('setProps' in this.props) {
@@ -239,7 +239,8 @@ export default class View extends Component {
           .setDistance(this.distance * (1.0 - this.props.zoomLimit));
     };
 
-    this.hover = debounce(({ x, y }) => {
+
+    this.hover = debounce(({ x, y }, event) => {
       if (this.props.pickingModes.indexOf('hover') === -1) {
         return;
       }
@@ -261,7 +262,7 @@ export default class View extends Component {
 
       // Share the selection with the rest of the world
       if (this.props.onHover) {
-        this.props.onHover(selection[0]);
+        this.props.onHover(selection[0], event);
       }
 
       if ('setProps' in this.props) {
@@ -278,7 +279,7 @@ export default class View extends Component {
 
       // Share the selection with the rest of the world
       if (this.props.onSelect) {
-        this.props.onSelect(pickResult);
+        this.props.onSelect(pickResult, event);
       }
 
       if ('setProps' in this.props) {
@@ -291,21 +292,24 @@ export default class View extends Component {
       handlePicking(
         this.props.onClick,
         'click',
-        this.getScreenEventPositionFor(e)
+        this.getScreenEventPositionFor(e),
+        e
       );
     this.onMouseDown = (e) =>
       handlePicking(
         this.props.onMouseDown,
         'mouseDown',
-        this.getScreenEventPositionFor(e)
+        this.getScreenEventPositionFor(e),
+        e
       );
     this.onMouseUp = (e) =>
       handlePicking(
         this.props.onMouseUp,
         'mouseUp',
-        this.getScreenEventPositionFor(e)
+        this.getScreenEventPositionFor(e),
+        e
       );
-    this.onMouseMove = (e) => this.hover(this.getScreenEventPositionFor(e));
+    this.onMouseMove = (e) => this.hover(this.getScreenEventPositionFor(e), e);
     this.onWheel = () => checkZoomLimit();
     this.onDrag = () => checkZoomLimit();
     this.lastSelection = [];
@@ -752,13 +756,9 @@ View.propTypes = {
   /**
    * List of picking listeners to bind. By default it is disabled (empty array).
    */
-  pickingModes: PropTypes.oneOf([
-    'click',
-    'hover',
-    'select',
-    'mouseDown',
-    'mouseUp',
-  ]),
+  pickingModes: PropTypes.arrayOf(
+    PropTypes.oneOf(['click', 'hover', 'select', 'mouseDown', 'mouseUp'])
+  ),
 
   /**
    * User callback function for click
