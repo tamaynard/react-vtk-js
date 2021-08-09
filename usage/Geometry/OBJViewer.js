@@ -7,7 +7,38 @@ import { View, GeometryRepresentation, Reader } from 'react-vtk-js';
 function Example(props) {
   return (
     <div style={{width: '100vw', height: '100vh'}}>
-      <View>
+      <View         interactorSettings={[
+                    {
+                        button: 1,
+                        action: 'Rotate',
+                        useWorldUpVec: true,
+                        useFocalPointAsCenterOfRotation: true,
+                    },
+                    {
+                        button: 2,
+                        action: 'Pan',
+                    },
+                    {
+                        button: 3,
+                        action: 'ZoomToMouse',
+                        scrollEnabled: true,
+                    },
+                    {
+                        button: 1,
+                        action: 'Pan',
+                        alt: true,
+                    },
+                    {
+                        button: 1,
+                        action: 'Zoom',
+                        control: true,
+                    },
+                    {
+                        button: 1,
+                        action: 'Select',
+                        shift: true,
+                    }
+					]}>
         <GeometryRepresentation
           property={{ color: [0.3, 0.3, 0.3] }}
         >

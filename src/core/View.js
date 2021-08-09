@@ -205,19 +205,26 @@ export default class View extends Component {
     };
 
     // Handle picking
-    const click = ({ x, y }) => {
-      if (this.props.pickingModes.indexOf('click') === -1) {
+    const handlePicking = (callback, pickingMode, { x, y }) => {
+      if (this.props.pickingModes.indexOf(pickingMode) === -1) {
         return;
       }
-      const selection = this.pick(x, y, x, y);
+      const tolerance = this.getPointerSizeTolerance();
+      const selection = this.pick(
+        Math.floor(x - tolerance),
+        Math.floor(y - tolerance),
+        Math.ceil(x + tolerance),
+        Math.ceil(y + tolerance),
+        false
+      );
 
       // Share the selection with the rest of the world
-      if (this.props.onClick) {
-        this.props.onClick(selection[0]);
+      if (callback) {
+        callback(selection[0]);
       }
 
       if ('setProps' in this.props) {
-        this.props.setProps({ clickInfo: selection[0] });
+        this.props.setProps({ [`${pickingMode}Info`]: selection[0] });
       }
     };
 
@@ -236,7 +243,15 @@ export default class View extends Component {
       if (this.props.pickingModes.indexOf('hover') === -1) {
         return;
       }
-      const selection = this.pick(x, y, x, y);
+
+      const tolerance = this.getPointerSizeTolerance();
+      const selection = this.pick(
+        Math.floor(x - tolerance),
+        Math.floor(y - tolerance),
+        Math.ceil(x + tolerance),
+        Math.ceil(y + tolerance),
+        false
+      );
 
       // Guard against trigger of empty selection
       if (this.lastSelection.length === 0 && selection.length === 0) {
@@ -259,7 +274,7 @@ export default class View extends Component {
         return;
       }
       const [x1, x2, y1, y2] = selection;
-      const pickResult = this.pick(x1, y1, x2, y2);
+      const pickResult = this.pick(x1, y1, x2, y2, true);
 
       // Share the selection with the rest of the world
       if (this.props.onSelect) {
@@ -272,8 +287,24 @@ export default class View extends Component {
     };
 
     this.distance = Infinity;
-
-    this.onClick = (e) => click(this.getScreenEventPositionFor(e));
+    this.onClick = (e) =>
+      handlePicking(
+        this.props.onClick,
+        'click',
+        this.getScreenEventPositionFor(e)
+      );
+    this.onMouseDown = (e) =>
+      handlePicking(
+        this.props.onMouseDown,
+        'mouseDown',
+        this.getScreenEventPositionFor(e)
+      );
+    this.onMouseUp = (e) =>
+      handlePicking(
+        this.props.onMouseUp,
+        'mouseUp',
+        this.getScreenEventPositionFor(e)
+      );
     this.onMouseMove = (e) => this.hover(this.getScreenEventPositionFor(e));
     this.onWheel = () => checkZoomLimit();
     this.onDrag = () => checkZoomLimit();
@@ -302,6 +333,10 @@ export default class View extends Component {
     );
   }
 
+  getPointerSizeTolerance() {
+    return this.props.pointerSize / 2;
+  }
+
   getScreenEventPositionFor(source) {
     const bounds = this.containerRef.current.getBoundingClientRect();
     const [canvasWidth, canvasHeight] = this.openglRenderWindow.getSize();
@@ -327,6 +362,7 @@ export default class View extends Component {
         onMouseEnter={this.onEnter}
         onMouseLeave={this.onLeave}
         onClick={this.onClick}
+        onMouseUp={this.onMouseUp}
         onMouseMove={this.onMouseMove}
         onDrag={this.onDrag}
       >
@@ -482,6 +518,11 @@ export default class View extends Component {
     if (previous && triggerResetCamera !== previous.triggerResetCamera) {
       this.resetCameraTimeout = setTimeout(this.resetCamera, 0);
     }
+
+    // Assign the mouseDown event, we can't use the React event system
+    // because the mouseDown event is swallowed by other logic
+    const canvas = this.openglRenderWindow.getCanvas();
+    canvas.addEventListener('mousedown', this.onMouseDown);
   }
 
   resetCamera() {
@@ -495,12 +536,12 @@ export default class View extends Component {
     this.renderWindow.render();
   }
 
-  pick(x1, y1, x2, y2) {
+  pick(x1, y1, x2, y2, useFrustrum = false) {
     this.selector.setArea(x1, y1, x2, y2);
     this.previousSelectedData = null;
     if (this.selector.captureBuffers()) {
       this.selections = this.selector.generateSelection(x1, y1, x2, y2) || [];
-      if (x1 !== x2 || y1 !== y2) {
+      if (useFrustrum) {
         const frustrum = [
           Array.from(
             this.openglRenderWindow.displayToWorld(x1, y1, 0, this.renderer)
@@ -530,7 +571,8 @@ export default class View extends Component {
         const representationIds = [];
         this.selections.forEach((v) => {
           const { prop } = v.getProperties();
-          const { representationId } = prop.get('representationId');
+          const representationId =
+            prop?.get('representationId').representationId;
           if (representationId) {
             representationIds.push(representationId);
           }
@@ -539,30 +581,45 @@ export default class View extends Component {
       }
       const ray = [
         Array.from(
-          this.openglRenderWindow.displayToWorld(x1, y1, 0, this.renderer)
+          this.openglRenderWindow.displayToWorld(
+            Math.round((x1 + x2) / 2),
+            Math.round((y1 + y2) / 2),
+            0,
+            this.renderer
+          )
         ),
         Array.from(
-          this.openglRenderWindow.displayToWorld(x1, y1, 1, this.renderer)
+          this.openglRenderWindow.displayToWorld(
+            Math.round((x1 + x2) / 2),
+            Math.round((y1 + y2) / 2),
+            1,
+            this.renderer
+          )
         ),
       ];
-      return this.selections.map((v) => {
-        const { prop, compositeID, displayPosition } = v.getProperties();
+      return this.selections
+        .map((v) => {
+          const { prop, compositeID, displayPosition } = v.getProperties();
 
-        return {
-          worldPosition: Array.from(
-            this.openglRenderWindow.displayToWorld(
-              displayPosition[0],
-              displayPosition[1],
-              displayPosition[2],
-              this.renderer
-            )
-          ),
-          displayPosition,
-          compositeID, // Not yet useful unless GlyphRepresentation
-          ...prop.get('representationId'),
-          ray,
-        };
-      });
+          // Return false to mark this item for removal
+          if (prop == null) return false;
+
+          return {
+            worldPosition: Array.from(
+              this.openglRenderWindow.displayToWorld(
+                displayPosition[0],
+                displayPosition[1],
+                displayPosition[2],
+                this.renderer
+              )
+            ),
+            displayPosition,
+            compositeID, // Not yet useful unless GlyphRepresentation
+            ...prop.get('representationId'),
+            ray,
+          };
+        })
+        .filter(Boolean);
     }
     return [];
   }
@@ -619,6 +676,7 @@ View.defaultProps = {
   interactive: true,
   pickingModes: [],
   showCubeAxes: false,
+  pointerSize: 0,
 };
 
 View.propTypes = {
@@ -692,9 +750,15 @@ View.propTypes = {
   ]),
 
   /**
-   * List of picking listeners to bind. The supported values are `click`, `hover` and `select`. By default it is disabled (empty array).
+   * List of picking listeners to bind. By default it is disabled (empty array).
    */
-  pickingModes: PropTypes.arrayOf(PropTypes.string),
+  pickingModes: PropTypes.oneOf([
+    'click',
+    'hover',
+    'select',
+    'mouseDown',
+    'mouseUp',
+  ]),
 
   /**
    * User callback function for click
@@ -707,6 +771,30 @@ View.propTypes = {
    * the picking info describing the object being clicked on.
    */
   clickInfo: PropTypes.object,
+
+  /**
+   * User callback function for mouse down
+   */
+  onMouseDown: PropTypes.func,
+
+  /**
+   * Read-only prop. To use this, make sure that `pickingModes` contains `mouseDown`.
+   * This prop is updated when a mouse down event is fired on an element in the map. This contains
+   * the picking info describing the object interested by the event.
+   */
+  mouseDownInfo: PropTypes.object,
+
+  /**
+   * User callback function for mouse up
+   */
+  onMouseUp: PropTypes.func,
+
+  /**
+   * Read-only prop. To use this, make sure that `pickingModes` contains `mouseUp`.
+   * This prop is updated when a mouse up event is fired on an element in the map. This contains
+   * the picking info describing the object interested by the event.
+   */
+  mouseUpInfo: PropTypes.object,
 
   /**
    * User callback function for hover
@@ -731,6 +819,11 @@ View.propTypes = {
    * the picking info describing the object being select along with the frustrum.
    */
   selectInfo: PropTypes.object,
+
+  /**
+   * Defines the tolerance of the click and hover selection.
+   */
+  pointerSize: PropTypes.number,
 
   /**
    * Show/Hide Cube Axes for the given representation
