@@ -243,7 +243,6 @@ export default class View extends Component {
           .setDistance(this.distance * (1.0 - this.props.zoomLimit));
     };
 
-
     this.hover = debounce(({ x, y }, event) => {
       if (this.props.pickingModes.indexOf('hover') === -1) {
         return;
@@ -579,8 +578,8 @@ export default class View extends Component {
         const representationIds = [];
         this.selections.forEach((v) => {
           const { prop } = v.getProperties();
-          const representationId = prop?.get('representationId')
-            .representationId;
+          const representationId =
+            prop?.get('representationId').representationId;
           if (representationId) {
             representationIds.push(representationId);
           }
