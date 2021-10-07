@@ -70,6 +70,7 @@ function assignManipulators(style, settings, view) {
         useWorldUpVec,
         worldUpVec,
         useFocalPointAsCenterOfRotation,
+        zoomScale,
       } = item;
       const manipulator = klass.newInstance();
       manipulator.setButton(button);
@@ -96,6 +97,9 @@ function assignManipulators(style, settings, view) {
         manipulator.setUseFocalPointAsCenterOfRotation(
           useFocalPointAsCenterOfRotation
         );
+      }
+      if (zoomScale !== undefined) {
+        manipulator.setZoomScale(zoomScale);
       }
     }
   });
