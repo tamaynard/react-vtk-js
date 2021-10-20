@@ -233,6 +233,13 @@ export default class View extends Component {
     };
 
     this.hover = debounce(({ x, y }, event) => {
+      if (
+        this.props.pickingModes.indexOf('mouseMove') !== -1 &&
+        this.props.onMouseMove
+      ) {
+        this.props.onMouseMove(event);
+      }
+
       if (this.props.pickingModes.indexOf('hover') === -1) {
         return;
       }
@@ -736,7 +743,14 @@ View.propTypes = {
    * List of picking listeners to bind. By default it is disabled (empty array).
    */
   pickingModes: PropTypes.arrayOf(
-    PropTypes.oneOf(['click', 'hover', 'select', 'mouseDown', 'mouseUp'])
+    PropTypes.oneOf([
+      'click',
+      'hover',
+      'select',
+      'mouseDown',
+      'mouseUp',
+      'mouseMove',
+    ])
   ),
 
   /**
@@ -798,6 +812,11 @@ View.propTypes = {
    * the picking info describing the object being select along with the frustrum.
    */
   selectInfo: PropTypes.object,
+
+  /**
+   * User callback function for mouseMove
+   */
+  onMouseMove: PropTypes.func,
 
   /**
    * Defines the tolerance of the click and hover selection.
